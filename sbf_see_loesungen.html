@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>SBF-See — Amtliche Prüfungsbögen 1–15</title>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 900px; margin: 0 auto; padding: 1.5rem; line-height: 1.5; }
+  h1 { margin: 0 0 0.25rem; }
+  .hint { color: #666; margin: 0 0 1rem; font-size: 0.9rem; }
+  .controls { position: sticky; top: 0; background: Canvas; padding: 0.75rem 0; border-bottom: 1px solid #ccc; z-index: 10; display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+  .controls label { font-weight: 600; }
+  .controls select, .controls button, .controls input { font: inherit; padding: 0.45rem 0.7rem; border-radius: 6px; border: 1px solid #bbb; background: Canvas; color: inherit; cursor: pointer; }
+  .controls input[type=search] { flex: 1; min-width: 180px; cursor: text; }
+  .controls button.active { background: #1f6feb; color: white; border-color: #1f6feb; }
+  .meta { color: #666; font-size: 0.85rem; margin: 0.75rem 0; }
+  .q { border: 1px solid #ddd; border-radius: 8px; padding: 0.9rem 1rem; margin: 0.75rem 0; }
+  .q header { display: flex; justify-content: space-between; font-size: 0.8rem; color: #666; margin-bottom: 0.4rem; }
+  .q .pos { font-weight: 600; color: #333; }
+  .q .num { font-family: ui-monospace, monospace; }
+  .stem { font-weight: 600; margin: 0.25rem 0 0.6rem; }
+  ol.answers { list-style: none; padding: 0; margin: 0; }
+  ol.answers li { padding: 0.4rem 0.6rem; border-radius: 4px; margin: 0.15rem 0; display: flex; gap: 0.5rem; align-items: flex-start; }
+  ol.answers li.correct { background: #d4edda; color: #155724; font-weight: 500; }
+  ol.answers li.wrong { color: #555; }
+  ol.answers .marker { width: 1em; flex-shrink: 0; font-weight: 600; }
+  ol.answers .letter { width: 1.3em; flex-shrink: 0; font-weight: 600; }
+  body.only-solutions ol.answers li.wrong { display: none; }
+  body.only-solutions .stem { opacity: 0.85; }
+  @media (prefers-color-scheme: dark) {
+    .q { border-color: #333; }
+    .hint, .q header, .meta { color: #aaa; }
+    .controls { border-color: #333; }
+    .controls select, .controls button, .controls input { border-color: #444; }
+    ol.answers li.correct { background: #1e4620; color: #c8e6c9; }
+    ol.answers li.wrong { color: #bbb; }
+  }
+</style>
+</head>
+<body>
+<h1>SBF-See — Amtliche Prüfungsbögen</h1>
+<p class="hint">15 offizielle Prüfungsbögen für den Sportbootführerschein See mit je 30 Fragen. Die korrekte Antwort ist grün markiert.</p>
+<div class="controls">
+  <label for="bogen">Prüfungsbogen:</label>
+  <select id="bogen"></select>
+  <input type="search" id="search" placeholder="Suche…">
+  <button id="toggle">Nur Lösungen anzeigen</button>
+</div>
+<p class="meta" id="meta"></p>
+<main id="list"></main>
+<script src="./sbf_see_data.js"></script>
+<script>
+  const DATA = window.SBF_SEE_DATA;
+  const bogenSel = document.getElementById('bogen');
+  const list = document.getElementById('list');
+  const meta = document.getElementById('meta');
+  const search = document.getElementById('search');
+  const toggle = document.getElementById('toggle');
+
+  for (let i = 1; i <= 15; i++) {
+    const o = document.createElement('option');
+    o.value = i;
+    o.textContent = 'Bogen ' + String(i).padStart(2, '0');
+    bogenSel.appendChild(o);
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  function render(bogen) {
+    const qs = DATA[bogen];
+    meta.textContent = `Bogen ${String(bogen).padStart(2,'0')} — ${qs.length} Fragen`;
+    list.innerHTML = qs.map((q, i) => {
+      const stem = escapeHtml(q.s);
+      const answers = ['a','b','c','d'].map(letter => {
+        const txt = escapeHtml(q[letter]);
+        const isCorrect = letter === q.correct;
+        const cls = isCorrect ? 'correct' : 'wrong';
+        const marker = isCorrect ? '✓' : '✗';
+        return `<li class="${cls}"><span class="marker">${marker}</span><span class="letter">${letter})</span> ${txt}</li>`;
+      }).join('');
+      return `<article class="q">
+        <header><span class="pos">Frage ${i+1} / 30</span><span class="num">Katalog-Nr. ${q.n}</span></header>
+        <p class="stem">${stem}</p>
+        <ol class="answers">${answers}</ol>
+      </article>`;
+    }).join('');
+    applySearch();
+  }
+
+  function applySearch() {
+    const q = search.value.trim().toLowerCase();
+    for (const it of list.querySelectorAll('article.q')) {
+      it.style.display = (!q || it.textContent.toLowerCase().includes(q)) ? '' : 'none';
+    }
+  }
+
+  bogenSel.addEventListener('change', () => {
+    const b = bogenSel.value;
+    render(b);
+    localStorage.setItem('sbf-bogen', b);
+  });
+  search.addEventListener('input', applySearch);
+  toggle.addEventListener('click', () => {
+    document.body.classList.toggle('only-solutions');
+    const on = document.body.classList.contains('only-solutions');
+    toggle.textContent = on ? 'Alle Antworten zeigen' : 'Nur Lösungen anzeigen';
+    toggle.classList.toggle('active', on);
+  });
+
+  const saved = localStorage.getItem('sbf-bogen') || '1';
+  bogenSel.value = saved;
+  render(saved);
+</script>
+</body>
+</html>
